@@ -34,6 +34,12 @@ export async function getBingAccessToken() {
   return (await Browser.cookies.get({ url: 'https://bing.com/', name: '_U' }))?.value
 }
 
+export async function getBardCookies() {
+  const token = (await Browser.cookies.get({ url: 'https://google.com/', name: '__Secure-1PSID' }))
+    ?.value
+  return '__Secure-1PSID=' + token
+}
+
 export function registerPortListener(executor) {
   Browser.runtime.onConnect.addListener((port) => {
     console.debug('connected')
@@ -55,7 +61,15 @@ export function registerPortListener(executor) {
               err.message.includes(m),
             )
           )
-            port.postMessage({ error: t('Exceeded maximum context length') + '\n' + err.message })
+            port.postMessage({ error: t('Exceeded maximum context length') + '\n\n' + err.message })
+          else if (['CaptchaChallenge', 'CAPTCHA'].some((m) => err.message.includes(m)))
+            port.postMessage({ error: t('Bing CaptchaChallenge') + '\n\n' + err.message })
+          else if (['exceeded your current quota'].some((m) => err.message.includes(m)))
+            port.postMessage({ error: t('Exceeded quota') + '\n\n' + err.message })
+          else if (['Rate limit reached'].some((m) => err.message.includes(m)))
+            port.postMessage({ error: t('Rate limit') + '\n\n' + err.message })
+          else if (['authentication token has expired'].some((m) => err.message.includes(m)))
+            port.postMessage({ error: 'UNAUTHORIZED' })
           else port.postMessage({ error: err.message })
         }
       }

@@ -1,7 +1,7 @@
 {
   "name": "ChatGPTBox",
   "description": "Integrating ChatGPT into your browser deeply, everything you need is here",
-  "version": "2.3.0",
+  "version": "2.3.8",
   "manifest_version": 2,
   "icons": {
     "16": "logo.png",
@@ -18,16 +18,14 @@
     "tabs",
     "https://*.openai.com/",
     "https://*.bing.com/",
-    "https://*.poe.com/"
-  ],
-  "optional_permissions": [
-    "background"
+    "https://*.poe.com/",
+    "https://*.google.com/"
   ],
   "background": {
     "scripts": [
       "background.js"
     ],
-    "persistent": false
+    "persistent": true
   },
   "browser_action": {
     "default_popup": "popup.html?popup=true"
@@ -79,6 +77,9 @@
     },
     "openConversationWindow": {
       "description": "Open the independent conversation window"
+    },
+    "closeAllChats": {
+      "description": "Close all chats in this page"
     }
   }
 }

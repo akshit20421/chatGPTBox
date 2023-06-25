@@ -60,16 +60,17 @@ export async function generateAnswersWithChatgptWebApi(port, question, session, 
     session.parentMessageId = uuidv4()
   }
 
-  const { controller, messageListener } = setAbortController(port, null, () => {
+  const { controller, messageListener, disconnectListener } = setAbortController(port, null, () => {
     if (session.autoClean) deleteConversation(accessToken, session.conversationId)
   })
 
   const models = await getModels(accessToken).catch(() => {
     port.onMessage.removeListener(messageListener)
+    port.onDisconnect.removeListener(disconnectListener)
   })
   console.debug('models', models)
   const config = await getUserConfig()
-  const selectedModel = Models[config.modelName].value
+  const selectedModel = Models[session.modelName].value
   const usedModel =
     models && models.includes(selectedModel) ? selectedModel : Models[chatgptWebModelKeys[0]].value
   console.debug('usedModel', usedModel)
@@ -111,7 +112,7 @@ export async function generateAnswersWithChatgptWebApi(port, question, session, 
       parent_message_id: session.parentMessageId,
       timezone_offset_min: new Date().getTimezoneOffset(),
       variant_purpose: 'none',
-      history_and_training_disabled: true,
+      history_and_training_disabled: config.disableWebModeHistory,
     }),
     onMessage(message) {
       console.debug('sse message', message)
@@ -141,9 +142,11 @@ export async function generateAnswersWithChatgptWebApi(port, question, session, 
     },
     async onEnd() {
       port.onMessage.removeListener(messageListener)
+      port.onDisconnect.removeListener(disconnectListener)
     },
     async onError(resp) {
       port.onMessage.removeListener(messageListener)
+      port.onDisconnect.removeListener(disconnectListener)
       if (resp instanceof Error) throw resp
       if (resp.status === 403) {
         throw new Error('CLOUDFLARE')

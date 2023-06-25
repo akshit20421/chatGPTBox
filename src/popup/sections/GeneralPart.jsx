@@ -16,10 +16,64 @@ import {
 import Browser from 'webextension-polyfill'
 import { languageList } from '../../config/language.mjs'
 import PropTypes from 'prop-types'
+import { config as menuConfig } from '../../content-script/menu-tools'
 
 GeneralPart.propTypes = {
   config: PropTypes.object.isRequired,
   updateConfig: PropTypes.func.isRequired,
+}
+
+function formatDate(date) {
+  const year = date.getFullYear()
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+async function checkBilling(apiKey, apiUrl) {
+  const now = new Date()
+  let startDate = new Date(now - 90 * 24 * 60 * 60 * 1000)
+  const endDate = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  const subDate = new Date(now)
+  subDate.setDate(1)
+
+  const urlSubscription = `${apiUrl}/v1/dashboard/billing/subscription`
+  let urlUsage = `${apiUrl}/v1/dashboard/billing/usage?start_date=${formatDate(
+    startDate,
+  )}&end_date=${formatDate(endDate)}`
+  const headers = {
+    Authorization: 'Bearer ' + apiKey,
+    'Content-Type': 'application/json',
+  }
+
+  try {
+    let response = await fetch(urlSubscription, { headers })
+    if (!response.ok) {
+      console.log('Your account has been suspended. Please log in to OpenAI to check.')
+      return [null, null, null]
+    }
+    const subscriptionData = await response.json()
+    const totalAmount = subscriptionData.hard_limit_usd
+
+    if (totalAmount > 20) {
+      startDate = subDate
+    }
+
+    urlUsage = `${apiUrl}/v1/dashboard/billing/usage?start_date=${formatDate(
+      startDate,
+    )}&end_date=${formatDate(endDate)}`
+
+    response = await fetch(urlUsage, { headers })
+    const usageData = await response.json()
+    const totalUsage = usageData.total_usage / 100
+    const remaining = totalAmount - totalUsage
+
+    return [totalAmount, totalUsage, remaining]
+  } catch (error) {
+    console.error(error)
+    return [null, null, null]
+  }
 }
 
 export function GeneralPart({ config, updateConfig }) {
@@ -34,7 +88,11 @@ export function GeneralPart({ config, updateConfig }) {
       },
     })
     if (response.ok) setBalance((await response.json()).total_available.toFixed(2))
-    else openUrl('https://platform.openai.com/account/usage')
+    else {
+      const billing = await checkBilling(config.apiKey, config.customOpenAiApiUrl)
+      if (billing && billing.length > 2 && billing[2]) setBalance(`${billing[2].toFixed(2)}`)
+      else openUrl('https://platform.openai.com/account/usage')
+    }
   }
 
   return (
@@ -94,13 +152,25 @@ export function GeneralPart({ config, updateConfig }) {
               updateConfig({ modelName: modelName })
             }}
           >
-            {config.activeApiModes.map((key) => {
-              const model = Models[key]
-              return (
-                <option value={key} key={key} selected={key === config.modelName}>
-                  {t(model.desc)}
-                </option>
-              )
+            {config.activeApiModes.map((modelName) => {
+              let desc
+              if (modelName.includes('-')) {
+                const splits = modelName.split('-')
+                if (splits[0] in Models)
+                  desc = `${t(Models[splits[0]].desc)} (${t(ModelMode[splits[1]])})`
+              } else {
+                if (modelName in Models) desc = t(Models[modelName].desc)
+              }
+              if (desc)
+                return (
+                  <option
+                    value={modelName}
+                    key={modelName}
+                    selected={modelName === config.modelName}
+                  >
+                    {desc}
+                  </option>
+                )
             })}
           </select>
           {isUsingMultiModeModel(config) && (
@@ -272,6 +342,27 @@ export function GeneralPart({ config, updateConfig }) {
         </select>
       </label>
       <label>
+        <legend>{t('When Icon Clicked')}</legend>
+        <select
+          required
+          onChange={(e) => {
+            const mode = e.target.value
+            updateConfig({ clickIconAction: mode })
+          }}
+        >
+          <option value="popup" key="popup" selected={config.clickIconAction === 'popup'}>
+            {t('Open Settings')}
+          </option>
+          {Object.entries(menuConfig).map(([k, v]) => {
+            return (
+              <option value={k} key={k} selected={k === config.clickIconAction}>
+                {t(v.label)}
+              </option>
+            )
+          })}
+        </select>
+      </label>
+      <label>
         <input
           type="checkbox"
           checked={config.insertAtTop}
@@ -307,6 +398,17 @@ export function GeneralPart({ config, updateConfig }) {
       <label>
         <input
           type="checkbox"
+          checked={config.selectionToolsNextToInputBox}
+          onChange={(e) => {
+            const checked = e.target.checked
+            updateConfig({ selectionToolsNextToInputBox: checked })
+          }}
+        />
+        {t('Display selection tools next to input box to avoid blocking')}
+      </label>
+      <label>
+        <input
+          type="checkbox"
           checked={config.alwaysPinWindow}
           onChange={(e) => {
             const checked = e.target.checked
@@ -314,6 +416,17 @@ export function GeneralPart({ config, updateConfig }) {
           }}
         />
         {t('Always pin the floating window')}
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={config.focusAfterAnswer}
+          onChange={(e) => {
+            const checked = e.target.checked
+            updateConfig({ focusAfterAnswer: checked })
+          }}
+        />
+        {t('Focus to input box after answering')}
       </label>
       <br />
     </>

@@ -51,9 +51,9 @@ export const config = {
   },
   duckduckgo: {
     inputQuery: ["input[name='q']"],
-    sidebarContainerQuery: ['.results--sidebar.js-results-sidebar'],
+    sidebarContainerQuery: ['.js-react-sidebar', '.react-results--sidebar'],
     appendContainerQuery: ['#links_wrapper'],
-    resultsContainerQuery: ['.results'],
+    resultsContainerQuery: ['.react-results--main'],
   },
   startpage: {
     inputQuery: ["input[name='query']"],
@@ -145,9 +145,9 @@ export const config = {
   },
   gitlab: {
     inputQuery: gitlab.inputQuery,
-    sidebarContainerQuery: ['.js-commit-box-info'],
+    sidebarContainerQuery: ['.info-well', '.js-commit-box-info'],
     appendContainerQuery: [],
-    resultsContainerQuery: ['.js-commit-box-info'],
+    resultsContainerQuery: ['.info-well', '.js-commit-box-info'],
   },
   zhihu: {
     inputQuery: zhihu.inputQuery,
@@ -157,9 +157,9 @@ export const config = {
   },
   reddit: {
     inputQuery: reddit.inputQuery,
-    sidebarContainerQuery: ['.side div:nth-child(2)'],
+    sidebarContainerQuery: ['#pdp-right-rail-topics div'],
     appendContainerQuery: [],
-    resultsContainerQuery: ['.side div:nth-child(2)'],
+    resultsContainerQuery: ['#pdp-right-rail-topics div'],
   },
   quora: {
     inputQuery: quora.inputQuery,
@@ -181,7 +181,7 @@ export const config = {
   },
   'mp.weixin.qq': {
     inputQuery: weixin.inputQuery,
-    sidebarContainerQuery: [],
+    sidebarContainerQuery: ['.qr_code_pc', '#js_content'],
     appendContainerQuery: [],
     resultsContainerQuery: ['#js_content'],
   },

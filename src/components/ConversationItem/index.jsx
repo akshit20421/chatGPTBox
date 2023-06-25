@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { ChevronDownIcon, XCircleIcon, SyncIcon } from '@primer/octicons-react'
 import CopyButton from '../CopyButton'
+import ReadButton from '../ReadButton'
 import PropTypes from 'prop-types'
 import MarkdownRender from '../MarkdownRender/markdown.jsx'
 import { useTranslation } from 'react-i18next'
 import { isUsingCustomModel } from '../../config/index.mjs'
 import { useConfig } from '../../hooks/use-config.mjs'
 
+// eslint-disable-next-line
 export function ConversationItem({ type, content, session, done, port, onRetry }) {
   const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(false)
@@ -20,6 +22,7 @@ export function ConversationItem({ type, content, session, done, port, onRetry }
             <p>{t('You')}:</p>
             <div className="gpt-util-group">
               <CopyButton contentFn={() => content.replace(/\n<hr\/>$/, '')} size={14} />
+              <ReadButton contentFn={() => content} size={14} />
               {!collapsed ? (
                 <span
                   title={t('Collapse')}
@@ -54,17 +57,6 @@ export function ConversationItem({ type, content, session, done, port, onRetry }
                 : t('Loading...')}
             </p>
             <div className="gpt-util-group">
-              {!done && (
-                <button
-                  type="button"
-                  className="normal-button"
-                  onClick={() => {
-                    port.postMessage({ stop: true })
-                  }}
-                >
-                  {t('Stop')}
-                </button>
-              )}
               {onRetry && (
                 <span title={t('Retry')} className="gpt-util-icon" onClick={onRetry}>
                   <SyncIcon size={14} />
@@ -73,6 +65,7 @@ export function ConversationItem({ type, content, session, done, port, onRetry }
               {session && (
                 <CopyButton contentFn={() => content.replace(/\n<hr\/>$/, '')} size={14} />
               )}
+              {session && <ReadButton contentFn={() => content} size={14} />}
               {!collapsed ? (
                 <span
                   title={t('Collapse')}

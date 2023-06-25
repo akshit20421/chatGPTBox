@@ -80,7 +80,7 @@ function FloatingToolbar(props) {
     return (
       <div data-theme={config.themeMode}>
         <Draggable
-          handle=".dragbar"
+          handle=".draggable"
           onDrag={dragEvent.onDrag}
           onStop={dragEvent.onStop}
           position={virtualPosition}
@@ -139,7 +139,7 @@ function FloatingToolbar(props) {
         <div className="chatgptbox-selection-toolbar">
           <img
             src={logo}
-            style="user-select:none;width:24px;height:24px;background:rgba(0,0,0,0);"
+            style="user-select:none;width:24px;height:24px;background:rgba(0,0,0,0);filter:none;"
           />
           {tools}
         </div>

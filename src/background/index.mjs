@@ -15,11 +15,13 @@ import { generateAnswersWithWaylaidwandererApi } from '../services/apis/waylaidw
 import { generateAnswersWithPoeWebApi } from '../services/apis/poe-web.mjs'
 import {
   azureOpenAiApiModelKeys,
+  bardWebModelKeys,
   bingWebModelKeys,
   chatgptApiModelKeys,
   chatgptWebModelKeys,
   customApiModelKeys,
   defaultConfig,
+  getUserConfig,
   githubThirdPartyApiModelKeys,
   gptApiModelKeys,
   Models,
@@ -29,12 +31,14 @@ import {
 import '../_locales/i18n'
 import { openUrl } from '../utils/open-url'
 import {
+  getBardCookies,
   getBingAccessToken,
   getChatGptAccessToken,
   registerPortListener,
 } from '../services/wrappers.mjs'
 import { refreshMenu } from './menus.mjs'
 import { registerCommands } from './commands.mjs'
+import { generateAnswersWithBardWebApi } from '../services/apis/bard-web.mjs'
 
 function setPortProxy(port, proxyTabId) {
   port.proxy = Browser.tabs.connect(proxyTabId)
@@ -60,6 +64,7 @@ function setPortProxy(port, proxyTabId) {
 }
 
 async function executeApi(session, port, config) {
+  console.debug('modelName', session.modelName)
   if (chatgptWebModelKeys.includes(session.modelName)) {
     let tabId
     if (
@@ -78,9 +83,9 @@ async function executeApi(session, port, config) {
       const accessToken = await getChatGptAccessToken()
       await generateAnswersWithChatgptWebApi(port, session.question, session, accessToken)
     }
-  } else if (bingWebModelKeys.includes(session.modelName)) {
+  } else if (bingWebModelKeys.some((n) => session.modelName.includes(n))) {
     const accessToken = await getBingAccessToken()
-    if (session.modelName === 'bingFreeSydney')
+    if (session.modelName.includes('bingFreeSydney'))
       await generateAnswersWithBingWebApi(port, session.question, session, accessToken, true)
     else await generateAnswersWithBingWebApi(port, session.question, session, accessToken)
   } else if (gptApiModelKeys.includes(session.modelName)) {
@@ -115,6 +120,9 @@ async function executeApi(session, port, config) {
         session,
         Models[session.modelName].value,
       )
+  } else if (bardWebModelKeys.includes(session.modelName)) {
+    const cookies = await getBardCookies()
+    await generateAnswersWithBardWebApi(port, session.question, session, cookies)
   }
 }
 
@@ -143,12 +151,33 @@ Browser.runtime.onMessage.addListener(async (message, sender) => {
       }
       break
     }
+    case 'SET_CHATGPT_TAB': {
+      await setUserConfig({
+        chatgptTabId: sender.tab.id,
+      })
+      break
+    }
     case 'ACTIVATE_URL':
       await Browser.tabs.update(message.data.tabId, { active: true })
       break
     case 'OPEN_URL':
       openUrl(message.data.url)
       break
+    case 'OPEN_CHAT_WINDOW': {
+      const config = await getUserConfig()
+      const url = Browser.runtime.getURL('IndependentPanel.html')
+      const tabs = await Browser.tabs.query({ url: url, windowType: 'popup' })
+      if (!config.alwaysCreateNewConversationWindow && tabs.length > 0)
+        await Browser.windows.update(tabs[0].windowId, { focused: true })
+      else
+        await Browser.windows.create({
+          url: url,
+          type: 'popup',
+          width: 500,
+          height: 650,
+        })
+      break
+    }
     case 'REFRESH_MENU':
       refreshMenu()
       break

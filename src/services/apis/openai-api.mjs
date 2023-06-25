@@ -25,7 +25,7 @@ export async function generateAnswersWithGptCompletionApi(
   apiKey,
   modelName,
 ) {
-  const { controller, messageListener } = setAbortController(port)
+  const { controller, messageListener, disconnectListener } = setAbortController(port)
 
   const config = await getUserConfig()
   const prompt =
@@ -51,6 +51,7 @@ export async function generateAnswersWithGptCompletionApi(
       stream: true,
       max_tokens: config.maxResponseTokenLength,
       temperature: config.temperature,
+      stop: '\nHuman',
     }),
     onMessage(message) {
       console.debug('sse message', message)
@@ -73,9 +74,11 @@ export async function generateAnswersWithGptCompletionApi(
     async onStart() {},
     async onEnd() {
       port.onMessage.removeListener(messageListener)
+      port.onDisconnect.removeListener(disconnectListener)
     },
     async onError(resp) {
       port.onMessage.removeListener(messageListener)
+      port.onDisconnect.removeListener(disconnectListener)
       if (resp instanceof Error) throw resp
       const error = await resp.json().catch(() => ({}))
       throw new Error(!isEmpty(error) ? JSON.stringify(error) : `${resp.status} ${resp.statusText}`)
@@ -91,7 +94,7 @@ export async function generateAnswersWithGptCompletionApi(
  * @param {string} modelName
  */
 export async function generateAnswersWithChatgptApi(port, question, session, apiKey, modelName) {
-  const { controller, messageListener } = setAbortController(port)
+  const { controller, messageListener, disconnectListener } = setAbortController(port)
 
   const config = await getUserConfig()
   const prompt = getConversationPairs(
@@ -132,17 +135,21 @@ export async function generateAnswersWithChatgptApi(port, question, session, api
         console.debug('json error', error)
         return
       }
-      if ('content' in data.choices[0].delta) {
-        answer += data.choices[0].delta.content
-        port.postMessage({ answer: answer, done: false, session: null })
-      }
+      answer +=
+        data.choices[0]?.delta?.content ||
+        data.choices[0]?.message?.content ||
+        data.choices[0]?.text ||
+        ''
+      port.postMessage({ answer: answer, done: false, session: null })
     },
     async onStart() {},
     async onEnd() {
       port.onMessage.removeListener(messageListener)
+      port.onDisconnect.removeListener(disconnectListener)
     },
     async onError(resp) {
       port.onMessage.removeListener(messageListener)
+      port.onDisconnect.removeListener(disconnectListener)
       if (resp instanceof Error) throw resp
       const error = await resp.json().catch(() => ({}))
       throw new Error(!isEmpty(error) ? JSON.stringify(error) : `${resp.status} ${resp.statusText}`)

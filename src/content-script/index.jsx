@@ -135,23 +135,28 @@ async function prepareForSelectionTools() {
     if (toolbarContainer && selectionElement && toolbarContainer.contains(selectionElement)) return
 
     deleteToolbar()
-    setTimeout(() => {
+    setTimeout(async () => {
       const selection = window
         .getSelection()
         ?.toString()
         .trim()
         .replace(/^-+|-+$/g, '')
       if (selection) {
-        const inputElement = selectionElement.querySelector('input, textarea')
         let position
-        if (inputElement) {
-          position = getClientPosition(inputElement)
-          position = {
-            x: position.x + window.scrollX + inputElement.offsetWidth + 50,
-            y: e.pageY + 30,
+
+        const config = await getUserConfig()
+        if (!config.selectionToolsNextToInputBox) position = { x: e.pageX + 20, y: e.pageY + 20 }
+        else {
+          const inputElement = selectionElement.querySelector('input, textarea')
+          if (inputElement) {
+            position = getClientPosition(inputElement)
+            position = {
+              x: position.x + window.scrollX + inputElement.offsetWidth + 50,
+              y: e.pageY + 30,
+            }
+          } else {
+            position = { x: e.pageX + 20, y: e.pageY + 20 }
           }
-        } else {
-          position = { x: e.pageX + 20, y: e.pageY + 20 }
         }
         toolbarContainer = createElementAtPosition(position.x, position.y)
         createSelectionTools(toolbarContainer, selection)
@@ -227,7 +232,7 @@ async function prepareForRightClickMenu() {
         const menuItem = menuConfig[data.itemId]
         if (!menuItem.genPrompt) return
         else prompt = await menuItem.genPrompt()
-        if (prompt) prompt = cropText(`Reply in ${await getPreferredLanguage()}.\n` + prompt)
+        if (prompt) prompt = await cropText(`Reply in ${await getPreferredLanguage()}.\n` + prompt)
       }
 
       const position = data.useMenuPosition
@@ -302,7 +307,7 @@ async function overwriteAccessToken() {
 }
 
 async function prepareForForegroundRequests() {
-  if (location.hostname !== 'chat.openai.com') return
+  if (location.hostname !== 'chat.openai.com' || location.pathname === '/auth/login') return
 
   const userConfig = await getUserConfig()
 
@@ -313,10 +318,8 @@ async function prepareForForegroundRequests() {
   render(<NotificationForChatGPTWeb container={div} />, div)
 
   await Browser.runtime.sendMessage({
-    type: 'PIN_TAB',
-    data: {
-      saveAsChatgptConfig: true,
-    },
+    type: 'SET_CHATGPT_TAB',
+    data: {},
   })
 
   registerPortListener(async (session, port) => {

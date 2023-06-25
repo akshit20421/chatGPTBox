@@ -25,7 +25,7 @@
   "Prepend Query": "Sélecteur à insérer",
   "Wechat Pay": "Paiement Wechat",
   "Type your question here\nEnter to send, shift + enter to break line": "Tapez votre question ici\nAppuyez sur entrée pour envoyer, shift+entrée pour passer à la ligne suivante",
-  "Wait for the answer to finish and then continue here": "Attendez la fin de la réponse avant de continuer ici",
+  "Type your question here\nEnter to stop generating\nShift + enter to break line": "Tapez votre question ici\nAppuyez sur Entrée pour arrêter la génération\nShift + Entrée pour passer à la ligne suivante",
   "Ask ChatGPT": "Demander à ChatGPT",
   "No Input Found": "Aucune entrée trouvée",
   "You": "Vous",
@@ -97,5 +97,6 @@
   "Keyboard Shortcuts": "Raccourcis clavier",
   "Open Conversation Page": "Ouvrir la page de conversation",
   "Open Conversation Window": "Ouvrir la fenêtre de conversation",
-  "Store to Independent Conversation Page": "Enregistrer sur une page de conversation indépendante"
+  "Store to Independent Conversation Page": "Enregistrer sur une page de conversation indépendante",
+  "Close All Chats In This Page": "Fermez tous les chats sur cette page"
 }

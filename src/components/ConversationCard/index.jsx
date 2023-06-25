@@ -3,14 +3,19 @@ import PropTypes from 'prop-types'
 import Browser from 'webextension-polyfill'
 import InputBox from '../InputBox'
 import ConversationItem from '../ConversationItem'
-import { createElementAtPosition, isSafari } from '../../utils'
-import { DownloadIcon, LinkExternalIcon, ArchiveIcon } from '@primer/octicons-react'
+import { createElementAtPosition, isFirefox, isMobile, isSafari } from '../../utils'
+import {
+  LinkExternalIcon,
+  ArchiveIcon,
+  DesktopDownloadIcon,
+  MoveToBottomIcon,
+} from '@primer/octicons-react'
 import { WindowDesktop, XLg, Pin } from 'react-bootstrap-icons'
 import FileSaver from 'file-saver'
 import { render } from 'preact'
 import FloatingToolbar from '../FloatingToolbar'
 import { useClampWindowSize } from '../../hooks/use-clamp-window-size'
-import { Models } from '../../config/index.mjs'
+import { ModelMode, Models } from '../../config/index.mjs'
 import { useTranslation } from 'react-i18next'
 import DeleteButton from '../DeleteButton'
 import { useConfig } from '../../hooks/use-config.mjs'
@@ -42,6 +47,8 @@ function ConversationCard(props) {
   const [session, setSession] = useState(props.session)
   const windowSize = useClampWindowSize([750, 1500], [250, 1100])
   const bodyRef = useRef(null)
+  const [completeDraggable, setCompleteDraggable] = useState(false)
+
   /**
    * @type {[ConversationItemData[], (conversationItemData: ConversationItemData[]) => void]}
    */
@@ -59,8 +66,8 @@ function ConversationCard(props) {
       else {
         const ret = []
         for (const record of session.conversationRecords) {
-          ret.push(new ConversationItemData('question', record.question + '\n<hr/>', true))
-          ret.push(new ConversationItemData('answer', record.answer + '\n<hr/>', true))
+          ret.push(new ConversationItemData('question', record.question, true))
+          ret.push(new ConversationItemData('answer', record.answer, true))
         }
         return ret
       }
@@ -69,15 +76,24 @@ function ConversationCard(props) {
   const config = useConfig()
 
   useEffect(() => {
+    setCompleteDraggable(!isSafari() && !isFirefox() && !isMobile())
+  }, [])
+
+  useEffect(() => {
     if (props.onUpdate) props.onUpdate(port, session, conversationItemData)
   }, [session, conversationItemData])
 
   useEffect(() => {
-    bodyRef.current.scrollTop = bodyRef.current.scrollHeight
-  }, [session])
-
-  useEffect(() => {
-    if (config.lockWhenAnswer) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
+    const { offsetHeight, scrollHeight, scrollTop } = bodyRef.current
+    if (
+      config.lockWhenAnswer &&
+      scrollHeight <= scrollTop + offsetHeight + config.answerScrollMargin
+    ) {
+      bodyRef.current.scrollTo({
+        top: scrollHeight,
+        behavior: 'instant',
+      })
+    }
   }, [conversationItemData])
 
   useEffect(() => {
@@ -110,13 +126,23 @@ function ConversationCard(props) {
   }
 
   useEffect(() => {
-    const listener = () => {
+    const portListener = () => {
       setPort(Browser.runtime.connect())
       setIsReady(true)
     }
-    port.onDisconnect.addListener(listener)
+
+    const closeChatsListener = (message) => {
+      if (message.type === 'CLOSE_CHATS') {
+        port.disconnect()
+        if (props.onClose) props.onClose()
+      }
+    }
+
+    if (props.closeable) Browser.runtime.onMessage.addListener(closeChatsListener)
+    port.onDisconnect.addListener(portListener)
     return () => {
-      port.onDisconnect.removeListener(listener)
+      if (props.closeable) Browser.runtime.onMessage.removeListener(closeChatsListener)
+      port.onDisconnect.removeListener(portListener)
     }
   }, [port])
   useEffect(() => {
@@ -129,7 +155,7 @@ function ConversationCard(props) {
         setSession(msg.session)
       }
       if (msg.done) {
-        updateAnswer('\n<hr/>', true, 'answer', true)
+        updateAnswer('', true, 'answer', true)
         setIsReady(true)
       }
       if (msg.error) {
@@ -141,7 +167,7 @@ function ConversationCard(props) {
               }<br>${t('And refresh this page or type you question again')}` +
                 `<br><br>${t(
                   'Consider creating an api key at https://platform.openai.com/account/api-keys',
-                )}\n<hr/>`,
+                )}`,
               false,
               'error',
             )
@@ -155,7 +181,7 @@ function ConversationCard(props) {
               }<br>${t('And refresh this page or type you question again')}` +
                 `<br><br>${t(
                   'Consider creating an api key at https://platform.openai.com/account/api-keys',
-                )}\n<hr/>`,
+                )}`,
               false,
               'error',
             )
@@ -164,11 +190,11 @@ function ConversationCard(props) {
             if (
               conversationItemData[conversationItemData.length - 1].content.includes('gpt-loading')
             )
-              updateAnswer(msg.error + '\n<hr/>', false, 'error')
+              updateAnswer(msg.error, false, 'error')
             else
               setConversationItemData([
                 ...conversationItemData,
-                new ConversationItemData('error', msg.error + '\n<hr/>'),
+                new ConversationItemData('error', msg.error),
               ])
             break
         }
@@ -185,6 +211,15 @@ function ConversationCard(props) {
     updateAnswer(`<p class="gpt-loading">${t('Waiting for response...')}</p>`, false, 'answer')
     setIsReady(false)
 
+    if (session.conversationRecords.length > 0) {
+      const lastRecord = session.conversationRecords[session.conversationRecords.length - 1]
+      if (
+        conversationItemData[conversationItemData.length - 1].done &&
+        lastRecord.question === conversationItemData[conversationItemData.length - 2].content
+      ) {
+        session.conversationRecords.pop()
+      }
+    }
     const newSession = { ...session, isRetry: true }
     setSession(newSession)
     try {
@@ -197,8 +232,20 @@ function ConversationCard(props) {
 
   return (
     <div className="gpt-inner">
-      <div className="gpt-header" style="margin: 15px;">
-        <span className="gpt-util-group">
+      <div
+        className={
+          props.draggable ? `gpt-header${completeDraggable ? ' draggable' : ''}` : 'gpt-header'
+        }
+        style="user-select:none;"
+      >
+        <span
+          className="gpt-util-group"
+          style={{
+            padding: '15px 0 15px 15px',
+            ...(props.notClampSize ? {} : { flexGrow: isSafari() ? 0 : 1 }),
+            ...(isSafari() ? { maxWidth: '200px' } : {}),
+          }}
+        >
           {props.closeable ? (
             <XLg
               className="gpt-util-icon"
@@ -222,7 +269,7 @@ function ConversationCard(props) {
             <img src={logo} style="user-select:none;width:20px;height:20px;" />
           )}
           <select
-            style={props.notClampSize ? {} : { width: windowSize[0] * 0.05 + 'px' }}
+            style={props.notClampSize ? {} : { width: 0, flexGrow: 1 }}
             className="normal-button"
             required
             onChange={(e) => {
@@ -233,19 +280,51 @@ function ConversationCard(props) {
               else setSession(newSession)
             }}
           >
-            {config.activeApiModes.map((key) => {
-              const model = Models[key]
-              return (
-                <option value={key} key={key} selected={key === session.modelName}>
-                  {t(model.desc)}
-                </option>
-              )
+            {config.activeApiModes.map((modelName) => {
+              let desc
+              if (modelName.includes('-')) {
+                const splits = modelName.split('-')
+                if (splits[0] in Models)
+                  desc = `${t(Models[splits[0]].desc)} (${t(ModelMode[splits[1]])})`
+              } else {
+                if (modelName in Models) desc = t(Models[modelName].desc)
+              }
+              if (desc)
+                return (
+                  <option
+                    value={modelName}
+                    key={modelName}
+                    selected={modelName === session.modelName}
+                  >
+                    {desc}
+                  </option>
+                )
             })}
           </select>
         </span>
-        {props.draggable ? (
-          <div className="dragbar" />
-        ) : (
+        {props.draggable && !completeDraggable && (
+          <div className="draggable" style={{ flexGrow: 2, cursor: 'move', height: '55px' }} />
+        )}
+        <span
+          className="gpt-util-group"
+          style={{
+            padding: '15px 15px 15px 0',
+            justifyContent: 'flex-end',
+            flexGrow: props.draggable && !completeDraggable ? 0 : 1,
+          }}
+        >
+          {!config.disableWebModeHistory && session && session.conversationId && (
+            <a
+              title={t('Continue on official website')}
+              href={'https://chat.openai.com/chat/' + session.conversationId}
+              target="_blank"
+              rel="nofollow noopener noreferrer"
+              className="gpt-util-icon"
+              style="color: inherit;"
+            >
+              <LinkExternalIcon size={16} />
+            </a>
+          )}
           <WindowDesktop
             className="gpt-util-icon"
             title={t('Float the Window')}
@@ -266,20 +345,6 @@ function ConversationCard(props) {
               )
             }}
           />
-        )}
-        <span className="gpt-util-group">
-          {session && session.conversationId && (
-            <a
-              title={t('Continue on official website')}
-              href={'https://chat.openai.com/chat/' + session.conversationId}
-              target="_blank"
-              rel="nofollow noopener noreferrer"
-              className="gpt-util-icon"
-              style="color: inherit;"
-            >
-              <LinkExternalIcon size={16} />
-            </a>
-          )}
           <DeleteButton
             size={16}
             text={t('Clear Conversation')}
@@ -326,6 +391,20 @@ function ConversationCard(props) {
               <ArchiveIcon size={16} />
             </span>
           )}
+          {conversationItemData.length > 0 && (
+            <span
+              title={t('Jump to bottom')}
+              className="gpt-util-icon"
+              onClick={() => {
+                bodyRef.current.scrollTo({
+                  top: bodyRef.current.scrollHeight,
+                  behavior: 'smooth',
+                })
+              }}
+            >
+              <MoveToBottomIcon size={16} />
+            </span>
+          )}
           <span
             title={t('Save Conversation')}
             className="gpt-util-icon"
@@ -340,7 +419,7 @@ function ConversationCard(props) {
               FileSaver.saveAs(blob, 'conversation.md')
             }}
           >
-            <DownloadIcon size={16} />
+            <DesktopDownloadIcon size={16} />
           </span>
         </span>
       </div>
@@ -371,7 +450,7 @@ function ConversationCard(props) {
         port={port}
         reverseResizeDir={props.pageMode}
         onSubmit={(question) => {
-          const newQuestion = new ConversationItemData('question', question + '\n<hr/>')
+          const newQuestion = new ConversationItemData('question', question)
           const newAnswer = new ConversationItemData(
             'answer',
             `<p class="gpt-loading">${t('Waiting for response...')}</p>`,
