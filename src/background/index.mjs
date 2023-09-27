@@ -11,14 +11,17 @@ import {
 } from '../services/apis/openai-api'
 import { generateAnswersWithCustomApi } from '../services/apis/custom-api.mjs'
 import { generateAnswersWithAzureOpenaiApi } from '../services/apis/azure-openai-api.mjs'
+import { generateAnswersWithClaudeApi } from '../services/apis/claude-api.mjs'
 import { generateAnswersWithWaylaidwandererApi } from '../services/apis/waylaidwanderer-api.mjs'
 import { generateAnswersWithPoeWebApi } from '../services/apis/poe-web.mjs'
 import {
   azureOpenAiApiModelKeys,
+  claudeApiModelKeys,
   bardWebModelKeys,
   bingWebModelKeys,
   chatgptApiModelKeys,
   chatgptWebModelKeys,
+  claudeWebModelKeys,
   customApiModelKeys,
   defaultConfig,
   getUserConfig,
@@ -34,11 +37,13 @@ import {
   getBardCookies,
   getBingAccessToken,
   getChatGptAccessToken,
+  getClaudeSessionKey,
   registerPortListener,
 } from '../services/wrappers.mjs'
 import { refreshMenu } from './menus.mjs'
 import { registerCommands } from './commands.mjs'
 import { generateAnswersWithBardWebApi } from '../services/apis/bard-web.mjs'
+import { generateAnswersWithClaudeWebApi } from '../services/apis/claude-web.mjs'
 
 function setPortProxy(port, proxyTabId) {
   port.proxy = Browser.tabs.connect(proxyTabId)
@@ -108,6 +113,8 @@ async function executeApi(session, port, config) {
     await generateAnswersWithCustomApi(port, session.question, session, '', config.customModelName)
   } else if (azureOpenAiApiModelKeys.includes(session.modelName)) {
     await generateAnswersWithAzureOpenaiApi(port, session.question, session)
+  } else if (claudeApiModelKeys.includes(session.modelName)) {
+    await generateAnswersWithClaudeApi(port, session.question, session)
   } else if (githubThirdPartyApiModelKeys.includes(session.modelName)) {
     await generateAnswersWithWaylaidwandererApi(port, session.question, session)
   } else if (poeWebModelKeys.includes(session.modelName)) {
@@ -123,6 +130,9 @@ async function executeApi(session, port, config) {
   } else if (bardWebModelKeys.includes(session.modelName)) {
     const cookies = await getBardCookies()
     await generateAnswersWithBardWebApi(port, session.question, session, cookies)
+  } else if (claudeWebModelKeys.includes(session.modelName)) {
+    const sessionKey = await getClaudeSessionKey()
+    await generateAnswersWithClaudeWebApi(port, session.question, session, sessionKey)
   }
 }
 

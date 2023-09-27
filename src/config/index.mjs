@@ -30,6 +30,7 @@ export const chatgptWebModelKeys = [
 ]
 export const bingWebModelKeys = ['bingFree4', 'bingFreeSydney']
 export const bardWebModelKeys = ['bardWebFree']
+export const claudeWebModelKeys = ['claude2WebFree']
 export const gptApiModelKeys = ['gptApiDavinci']
 export const chatgptApiModelKeys = [
   'chatgptApi35',
@@ -43,6 +44,7 @@ export const chatgptApiModelKeys = [
 ]
 export const customApiModelKeys = ['customModel']
 export const azureOpenAiApiModelKeys = ['azureOpenAi']
+export const claudeApiModelKeys = ['claude2Api']
 export const githubThirdPartyApiModelKeys = ['waylaidwandererApi']
 export const poeWebModelKeys = [
   'poeAiWebSage', //poe.com/Assistant
@@ -81,6 +83,8 @@ export const Models = {
     value: 'gpt-3.5-turbo-16k-0613',
     desc: 'ChatGPT (GPT-3.5-turbo-16k 0613)',
   },
+  claude2WebFree: { value: 'claude-2', desc: 'Claude.ai (Web, Claude 2)' },
+  claude2Api: { value: '', desc: 'Claude.ai (API, Claude 2)' },
   bingFree4: { value: '', desc: 'Bing (Web, GPT-4)' },
   bingFreeSydney: { value: '', desc: 'Bing (Web, GPT-4, Sydney)' },
   bardWebFree: { value: '', desc: 'Bard (Web)' },
@@ -147,6 +151,7 @@ export const defaultConfig = {
 
   poeCustomBotName: '',
 
+  claudeApiKey: '',
   /** @type {keyof ModelMode}*/
   modelMode: 'balanced',
 
@@ -173,23 +178,25 @@ export const defaultConfig = {
 
   alwaysCreateNewConversationWindow: false,
   activeApiModes: [
+    // 'claude2Api',
     'chatgptFree35',
     'chatgptFree35Mobile',
-    'chatgptPlus4',
-    'chatgptPlus4Mobile',
+    // 'chatgptPlus4',
+    // 'chatgptPlus4Mobile',
     'chatgptApi35',
     'chatgptApi35_16k',
+    'claude2WebFree',
     'bingFree4',
     'bingFreeSydney',
-    'poeAiWebSage', //poe.com/Assistant
-    'poeAiWebGPT4',
-    'poeAiWebGPT4_32k',
-    'poeAiWebClaudePlus',
-    'poeAiWebClaude100k',
+    // 'poeAiWebSage', //poe.com/Assistant
+    // 'poeAiWebGPT4',
+    // 'poeAiWebGPT4_32k',
+    // 'poeAiWebClaudePlus',
+    // 'poeAiWebClaude100k',
     'chatgptApi4_8k',
     'customModel',
     'azureOpenAi',
-    'poeAiWebCustom',
+    // 'poeAiWebCustom',
   ],
   activeSelectionTools: ['translate', 'summary', 'polish', 'code', 'ask'],
   activeSiteAdapters: [
@@ -285,6 +292,9 @@ export function isUsingAzureOpenAi(configOrSession) {
   return azureOpenAiApiModelKeys.includes(configOrSession.modelName)
 }
 
+export function isUsingClaude2Api(configOrSession) {
+  return claudeApiModelKeys.includes(configOrSession.modelName)
+}
 export function isUsingGithubThirdPartyApi(configOrSession) {
   return githubThirdPartyApiModelKeys.includes(configOrSession.modelName)
 }

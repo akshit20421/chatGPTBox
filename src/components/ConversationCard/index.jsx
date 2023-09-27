@@ -101,7 +101,7 @@ function ConversationCard(props) {
   useEffect(async () => {
     // when the page is responsive, session may accumulate redundant data and needs to be cleared after remounting and before making a new request
     if (props.question) {
-      const newSession = initSession({ question: props.question })
+      const newSession = initSession({ ...session, question: props.question })
       setSession(newSession)
       await postMessage({ session: newSession })
     }
@@ -260,6 +260,7 @@ function ConversationCard(props) {
       const lastRecord = session.conversationRecords[session.conversationRecords.length - 1]
       if (
         conversationItemData[conversationItemData.length - 1].done &&
+        conversationItemData.length > 1 &&
         lastRecord.question === conversationItemData[conversationItemData.length - 2].content
       ) {
         session.conversationRecords.pop()
@@ -484,15 +485,13 @@ function ConversationCard(props) {
             key={idx}
             type={data.type}
             session={session}
-            done={data.done}
-            port={port}
             onRetry={idx === conversationItemData.length - 1 ? getRetryFn(session) : null}
           />
         ))}
       </div>
       <InputBox
         enabled={isReady}
-        port={port}
+        postMessage={postMessage}
         reverseResizeDir={props.pageMode}
         onSubmit={async (question) => {
           const newQuestion = new ConversationItemData('question', question)
