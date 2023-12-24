@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import Browser from 'webextension-polyfill'
 import InputBox from '../InputBox'
@@ -24,6 +24,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { initSession } from '../../services/init-session.mjs'
 import { findLastIndex } from 'lodash-es'
 import { generateAnswersWithBingWebApi } from '../../services/apis/bing-web.mjs'
+import { handlePortError } from '../../services/wrappers.mjs'
 
 const logo = Browser.runtime.getURL('logo.png')
 
@@ -49,7 +50,8 @@ function ConversationCard(props) {
   const windowSize = useClampWindowSize([750, 1500], [250, 1100])
   const bodyRef = useRef(null)
   const [completeDraggable, setCompleteDraggable] = useState(false)
-  const useForegroundFetch = bingWebModelKeys.includes(session.modelName)
+  // `.some` for multi mode models. e.g. bingFree4-balanced
+  const useForegroundFetch = bingWebModelKeys.some((n) => session.modelName.includes(n))
 
   /**
    * @type {[ConversationItemData[], (conversationItemData: ConversationItemData[]) => void]}
@@ -167,15 +169,19 @@ function ConversationCard(props) {
             'error',
           )
           break
-        default:
-          if (conversationItemData[conversationItemData.length - 1].content.includes('gpt-loading'))
-            updateAnswer(msg.error, false, 'error')
+        default: {
+          let lastItem
+          if (conversationItemData.length > 0)
+            lastItem = conversationItemData[conversationItemData.length - 1]
+          if (lastItem && (lastItem.content.includes('gpt-loading') || lastItem.type === 'error'))
+            updateAnswer(t(msg.error), false, 'error')
           else
             setConversationItemData([
               ...conversationItemData,
-              new ConversationItemData('error', msg.error),
+              new ConversationItemData('error', t(msg.error)),
             ])
           break
+        }
       }
       setIsReady(true)
     }
@@ -211,10 +217,20 @@ function ConversationCard(props) {
             removeListener: () => {},
           },
         }
-        const bingToken = (await getUserConfig()).bingAccessToken
-        if (session.modelName.includes('bingFreeSydney'))
-          await generateAnswersWithBingWebApi(fakePort, session.question, session, bingToken, true)
-        else await generateAnswersWithBingWebApi(fakePort, session.question, session, bingToken)
+        try {
+          const bingToken = (await getUserConfig()).bingAccessToken
+          if (session.modelName.includes('bingFreeSydney'))
+            await generateAnswersWithBingWebApi(
+              fakePort,
+              session.question,
+              session,
+              bingToken,
+              true,
+            )
+          else await generateAnswersWithBingWebApi(fakePort, session.question, session, bingToken)
+        } catch (err) {
+          handlePortError(session, fakePort, err)
+        }
       }
     } else {
       port.postMessage({ session, stop })
@@ -275,6 +291,8 @@ function ConversationCard(props) {
       updateAnswer(e, false, 'error')
     }
   }
+
+  const retryFn = useMemo(() => getRetryFn(session), [session])
 
   return (
     <div className="gpt-inner">
@@ -484,8 +502,9 @@ function ConversationCard(props) {
             content={data.content}
             key={idx}
             type={data.type}
-            session={session}
-            onRetry={idx === conversationItemData.length - 1 ? getRetryFn(session) : null}
+            descName={data.type === 'answer' && session.aiName}
+            modelName={data.type === 'answer' && session.modelName}
+            onRetry={idx === conversationItemData.length - 1 ? retryFn : null}
           />
         ))}
       </div>
@@ -509,6 +528,10 @@ function ConversationCard(props) {
           } catch (e) {
             updateAnswer(e, false, 'error')
           }
+          bodyRef.current.scrollTo({
+            top: bodyRef.current.scrollHeight,
+            behavior: 'instant',
+          })
         }}
       />
     </div>
@@ -517,7 +540,7 @@ function ConversationCard(props) {
 
 ConversationCard.propTypes = {
   session: PropTypes.object.isRequired,
-  question: PropTypes.string.isRequired,
+  question: PropTypes.string,
   onUpdate: PropTypes.func,
   draggable: PropTypes.bool,
   closeable: PropTypes.bool,

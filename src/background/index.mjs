@@ -12,11 +12,12 @@ import {
 import { generateAnswersWithCustomApi } from '../services/apis/custom-api.mjs'
 import { generateAnswersWithAzureOpenaiApi } from '../services/apis/azure-openai-api.mjs'
 import { generateAnswersWithClaudeApi } from '../services/apis/claude-api.mjs'
+import { generateAnswersWithChatGLMApi } from '../services/apis/chatglm-api.mjs'
 import { generateAnswersWithWaylaidwandererApi } from '../services/apis/waylaidwanderer-api.mjs'
-import { generateAnswersWithPoeWebApi } from '../services/apis/poe-web.mjs'
 import {
   azureOpenAiApiModelKeys,
   claudeApiModelKeys,
+  chatglmApiModelKeys,
   bardWebModelKeys,
   bingWebModelKeys,
   chatgptApiModelKeys,
@@ -27,7 +28,6 @@ import {
   getUserConfig,
   githubThirdPartyApiModelKeys,
   gptApiModelKeys,
-  Models,
   poeWebModelKeys,
   setUserConfig,
 } from '../config/index.mjs'
@@ -88,7 +88,10 @@ async function executeApi(session, port, config) {
       const accessToken = await getChatGptAccessToken()
       await generateAnswersWithChatgptWebApi(port, session.question, session, accessToken)
     }
-  } else if (bingWebModelKeys.includes(session.modelName)) {
+  } else if (
+    // `.some` for multi mode models. e.g. bingFree4-balanced
+    bingWebModelKeys.some((n) => session.modelName.includes(n))
+  ) {
     const accessToken = await getBingAccessToken()
     if (session.modelName.includes('bingFreeSydney'))
       await generateAnswersWithBingWebApi(port, session.question, session, accessToken, true)
@@ -110,29 +113,44 @@ async function executeApi(session, port, config) {
       session.modelName,
     )
   } else if (customApiModelKeys.includes(session.modelName)) {
-    await generateAnswersWithCustomApi(port, session.question, session, '', config.customModelName)
+    await generateAnswersWithCustomApi(
+      port,
+      session.question,
+      session,
+      config.customApiKey,
+      config.customModelName,
+    )
   } else if (azureOpenAiApiModelKeys.includes(session.modelName)) {
     await generateAnswersWithAzureOpenaiApi(port, session.question, session)
   } else if (claudeApiModelKeys.includes(session.modelName)) {
     await generateAnswersWithClaudeApi(port, session.question, session)
+  } else if (chatglmApiModelKeys.includes(session.modelName)) {
+    await generateAnswersWithChatGLMApi(port, session.question, session, session.modelName)
   } else if (githubThirdPartyApiModelKeys.includes(session.modelName)) {
     await generateAnswersWithWaylaidwandererApi(port, session.question, session)
   } else if (poeWebModelKeys.includes(session.modelName)) {
-    if (session.modelName === 'poeAiWebCustom')
-      await generateAnswersWithPoeWebApi(port, session.question, session, config.poeCustomBotName)
-    else
-      await generateAnswersWithPoeWebApi(
-        port,
-        session.question,
-        session,
-        Models[session.modelName].value,
-      )
+    throw new Error('Due to the new verification, Poe Web API is currently not supported.')
+    // if (session.modelName === 'poeAiWebCustom')
+    //   await generateAnswersWithPoeWebApi(port, session.question, session, config.poeCustomBotName)
+    // else
+    //   await generateAnswersWithPoeWebApi(
+    //     port,
+    //     session.question,
+    //     session,
+    //     Models[session.modelName].value,
+    //   )
   } else if (bardWebModelKeys.includes(session.modelName)) {
     const cookies = await getBardCookies()
     await generateAnswersWithBardWebApi(port, session.question, session, cookies)
   } else if (claudeWebModelKeys.includes(session.modelName)) {
     const sessionKey = await getClaudeSessionKey()
-    await generateAnswersWithClaudeWebApi(port, session.question, session, sessionKey)
+    await generateAnswersWithClaudeWebApi(
+      port,
+      session.question,
+      session,
+      sessionKey,
+      session.modelName,
+    )
   }
 }
 
@@ -216,6 +234,7 @@ Browser.runtime.onMessage.addListener(async (message, sender) => {
             body: text,
             status: response.status,
             statusText: response.statusText,
+            headers: Object.fromEntries(response.headers),
           },
           null,
         ]
@@ -226,24 +245,63 @@ Browser.runtime.onMessage.addListener(async (message, sender) => {
   }
 })
 
-Browser.webRequest.onBeforeSendHeaders.addListener(
-  (details) => {
-    const headers = details.requestHeaders
-    for (let i = 0; i < headers.length; i++) {
-      if (headers[i].name === 'Origin') {
-        headers[i].value = 'https://www.bing.com'
-      } else if (headers[i].name === 'Referer') {
-        headers[i].value = 'https://www.bing.com/search?q=Bing+AI&showconv=1&FORM=hpcodx'
+try {
+  Browser.webRequest.onBeforeRequest.addListener(
+    (details) => {
+      if (
+        details.url.includes('/public_key') &&
+        !details.url.includes(defaultConfig.chatgptArkoseReqParams)
+      ) {
+        let formData = new URLSearchParams()
+        for (const k in details.requestBody.formData) {
+          formData.append(k, details.requestBody.formData[k])
+        }
+        setUserConfig({
+          chatgptArkoseReqUrl: details.url,
+          chatgptArkoseReqForm: formData.toString(),
+        }).then(() => {
+          console.log('Arkose req url and form saved')
+        })
       }
-    }
-    return { requestHeaders: headers }
-  },
-  {
-    urls: ['wss://sydney.bing.com/*', 'https://www.bing.com/*'],
-    types: ['xmlhttprequest', 'websocket'],
-  },
-  ['requestHeaders'],
-)
+    },
+    {
+      urls: ['https://*.openai.com/*'],
+      types: ['xmlhttprequest'],
+    },
+    ['requestBody'],
+  )
+
+  Browser.webRequest.onBeforeSendHeaders.addListener(
+    (details) => {
+      const headers = details.requestHeaders
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i].name === 'Origin') {
+          headers[i].value = 'https://www.bing.com'
+        } else if (headers[i].name === 'Referer') {
+          headers[i].value = 'https://www.bing.com/search?q=Bing+AI&showconv=1&FORM=hpcodx'
+        }
+      }
+      return { requestHeaders: headers }
+    },
+    {
+      urls: ['wss://sydney.bing.com/*', 'https://www.bing.com/*'],
+      types: ['xmlhttprequest', 'websocket'],
+    },
+    ['requestHeaders'],
+  )
+
+  Browser.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+    if (!tab.url) return
+    // eslint-disable-next-line no-undef
+    await chrome.sidePanel.setOptions({
+      tabId,
+      path: 'IndependentPanel.html',
+      enabled: true,
+    })
+  })
+} catch (error) {
+  console.log(error)
+}
 
 registerPortListener(async (session, port, config) => await executeApi(session, port, config))
 registerCommands()

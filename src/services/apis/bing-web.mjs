@@ -37,8 +37,8 @@ export async function generateAnswersWithBingWebApi(
       abortController: controller,
       toneStyle: modelMode,
       jailbreakConversationId: sydneyMode,
-      onProgress: (token) => {
-        answer += token
+      onProgress: (message) => {
+        answer = message
         // reference markers [^number^]
         answer = answer.replaceAll(/\[\^(\d+)\^\]/g, '<sup>$1</sup>')
         port.postMessage({ answer: answer, done: false, session: null })
@@ -46,7 +46,7 @@ export async function generateAnswersWithBingWebApi(
       ...(session.bingWeb_conversationId
         ? {
             conversationId: session.bingWeb_conversationId,
-            conversationSignature: session.bingWeb_conversationSignature,
+            encryptedConversationSignature: session.bingWeb_encryptedConversationSignature,
             clientId: session.bingWeb_clientId,
             invocationId: session.bingWeb_invocationId,
           }
@@ -64,7 +64,7 @@ export async function generateAnswersWithBingWebApi(
     })
 
   if (!sydneyMode) {
-    session.bingWeb_conversationSignature = response.conversationSignature
+    session.bingWeb_encryptedConversationSignature = response.encryptedConversationSignature
     session.bingWeb_conversationId = response.conversationId
     session.bingWeb_clientId = response.clientId
     session.bingWeb_invocationId = response.invocationId

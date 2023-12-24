@@ -44,6 +44,8 @@
   "Save Conversation": "Konversation speichern",
   "UNAUTHORIZED": "Unbefugt",
   "Please login at https://chat.openai.com first": "Bitte zuerst bei https://chat.openai.com anmelden",
+  "Please login at https://claude.ai first": "Bitte zuerst bei https://claude.ai anmelden",
+  "Please login at https://bing.com first": "Bitte zuerst bei https://bing.com anmelden",
   "Then open https://chat.openai.com/api/auth/session": "Dann öffne https://chat.openai.com/api/auth/sitzung",
   "And refresh this page or type you question again": "Klicken Sie anschließend auf die Schaltfläche Wiederholen in der oberen rechten Ecke",
   "Consider creating an api key at https://platform.openai.com/account/api-keys": "Erwägen Sie ein API-Schlüssel unter https://platform.openai.com/account/api-keys zu erstellen",
@@ -124,5 +126,8 @@
   "Exceeded quota": "Überschrittenes Kontingent: Prüfen Sie Ihr Guthaben oder Ablaufdatum unter folgendem Link: https://platform.openai.com/account/usage",
   "Rate limit": "Rate-Limit erreicht",
   "Jump to bottom": "Zum Ende springen",
-  "Explain": "Erklären"
+  "Explain": "Erklären",
+  "Failed to get arkose token.": "Arkose-Token konnte nicht abgerufen werden.",
+  "Please keep https://chat.openai.com open and try again. If it still doesn't work, type some characters in the input box of chatgpt web page and try again.": "Bitte halten Sie https://chat.openai.com geöffnet und versuchen Sie es erneut. Wenn es immer noch nicht funktioniert, geben Sie einige Zeichen in das Eingabefeld der ChatGPT-Webseite ein und versuchen Sie es erneut.",
+  "Open Side Panel": "Seitenleiste öffnen"
 }
